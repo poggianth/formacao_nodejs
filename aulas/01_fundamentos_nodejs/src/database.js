@@ -20,8 +20,16 @@ export class Database {
         fs.writeFile(databasePath, JSON.stringify(this.#database));
     }
 
-    select(table) {
-        const data = this.#database[table] ?? [];
+    select(table, search) {
+        let data = this.#database[table] ?? [];
+
+        if(search){
+            data = data.filter(row => {
+                return Object.entries(search).some(([key, value]) => {
+                    return row[key].includes(value);
+                })
+            })
+        }
 
         return data;
     }
@@ -36,4 +44,23 @@ export class Database {
         this.#persistData();
         return data;
     }
+
+    delete(table, id_user){
+        const rowIndex = this.#database[table].findIndex(row => row.id === id_user);
+
+        if(rowIndex > -1){
+            this.#database[table].splice(rowIndex, 1);
+            this.#persistData();
+        }
+    }
+
+    update(table, id, new_data){
+        const rowIndex = this.#database[table].findIndex(row => row.id === id);
+
+        if(rowIndex > -1){
+            this.#database[table][rowIndex] = { id, ...new_data };
+            this.#persistData();
+        }
+    }
+
 }

@@ -2,6 +2,7 @@ import http from "node:http";
 // UUID => Unique Universal ID
 import { json } from "./middlewares/json.js";
 import { routes } from "./routes.js";
+import { extractQueryParams } from "./utils/extract_query_params.js";
 
 const port = 3333;
 
@@ -52,8 +53,11 @@ const server = http.createServer(async (req, res) => {
 
   if(route){
     const routeParams = req.url.match(route.path);
+    
+    const { query, ...params } = routeParams.groups;
 
-    console.log(routeParams)
+    req.params = params;
+    req.query = query ? extractQueryParams(query) : {};
 
     return route.handler(req, res);
   }
