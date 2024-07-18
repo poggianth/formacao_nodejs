@@ -1,8 +1,7 @@
 import http from "node:http";
 // UUID => Unique Universal ID
-import { randomUUID } from "node:crypto";
 import { json } from "./middlewares/json.js";
-import { Database } from "./database.js";
+import { routes } from "./routes.js";
 
 const port = 3333;
 
@@ -21,9 +20,23 @@ const port = 3333;
 
 - Cabeçalhos (req/res) => Metadados (informações adicionais)
 
+- Formas que o front-end pode nos enviar informações:
+  - Query Parameters:
+    - URL Stateful => Filtros, paginação, não-obrigatórios 
+    - Ex: http://localhost:3333/users?userId=1&name=Thiago
+  
+  - Route Parameters:
+    - Identificação de recurso (identificar qual usuário queremos listar, excluir e etc...)
+    - Ex:
+      - GET http://localhost:3333/users/1
+      - DELETE http://localhost:3333/users/1
+  
+  - Request Body:
+    - Envio de informações de um formulário (passa pelo protocolo HTTPs)
+    - Ex: POST http://localhost:3333/users
+
 */
 
-const database = new Database;
 
 const server = http.createServer(async (req, res) => {
   // Pegando os recursos da requisição recebida:
@@ -32,28 +45,17 @@ const server = http.createServer(async (req, res) => {
   // Middlewares são interceptadores e sempre receberão a req e res
   await json (req, res);
 
-  if (method === "GET" && url === "/users") {
-    const users = database.select('users');
+  const route = routes.find(route => {
+    // Testando se URL recebida atende os requisitos da nossa REGEX criada
+    return route.method === method && route.path.test(url)
+  });
 
-    return res.end(JSON.stringify(users));
-  }
+  if(route){
+    const routeParams = req.url.match(route.path);
 
-  if (method === "POST" && url === "/users") {
-    if (req.body == null) {
-      return res.writeHead(400).end("Body not found!");
-    }
+    console.log(routeParams)
 
-    const { name, email } = req.body;
-
-    const user = {
-      id: randomUUID(),
-      name: name,
-      email: email,
-    };
-
-    database.insert('users', user);
-
-    return res.writeHead(201).end();
+    return route.handler(req, res);
   }
 
   return res.writeHead(404).end("Not found!");
