@@ -2,9 +2,11 @@ import http from "node:http";
 // UUID => Unique Universal ID
 import { randomUUID } from "node:crypto";
 import { getBodyRequestJSON } from "./middlewares/get_body_request_json.js";
+import { Database } from "./database.js";
+
+const database = new Database();
 
 const port = 3000;
-const dbTasks = [];
 
 const server = http.createServer(async (req, res) => {
   const { method, url } = req;
@@ -17,70 +19,73 @@ const server = http.createServer(async (req, res) => {
 
     const { title, description } = req.body;
 
-    dbTasks.push({
+    const newTask = {
       id: randomUUID(),
       title: title,
       description: description,
       completed_at: null,
       created_at: new Date(),
       updated_at: null,
-    });
+    };
+
+    database.insert("tasks", newTask);
 
     return res.writeHead(200).end(`Task created!`);
   }
 
   if (method === "GET" && url === "/tasks") {
-    return res.end(JSON.stringify(dbTasks));
+    return res.end(JSON.stringify(database.select("tasks")));
   }
 
   if (method === "PUT" && url.includes("/tasks/")) {
-    const indexTaskDB = validateIdTask(req, res, url.split("/")[2]);
+    const idTask = url.split("/")[2];
+    const [task] = database.select("tasks", idTask);
 
-    if (indexTaskDB == -1) return;
+    if(task.length == 0){
+      return res.writeHead(400).end("Task not found!");
+    }
 
     if (!validateRequestBody(req, res)) return;
 
     const { title: newTitle, description: newDescription } = req.body;
 
-    const oldTask = dbTasks[indexTaskDB];
-
-    dbTasks[indexTaskDB] = {
-      id: oldTask.id,
-      title: newTitle || oldTask.title,
-      description: newDescription || oldTask.description,
-      completed_at: oldTask.completed_at,
-      created_at: oldTask.created_at,
-      updated_at: new Date(),
-    };
+    database.update("tasks", idTask, {
+      title: newTitle ?? task.title,
+      description: newDescription ?? task.description,
+      updated_at: new Date()
+    });
 
     return res.writeHead(200).end(`Task updated!`);
   }
 
   if (method === "DELETE" && url.includes("/tasks")) {
-    const indexTaskDB = validateIdTask(req, res, url.split("/")[2]);
+    const idTask = url.split("/")[2];
+    const [task] = database.select("tasks", idTask);
 
-    if (indexTaskDB == -1) return;
+    if(task.length == 0){
+      return res.writeHead(400).end("Task not found!");
+    }
 
-    dbTasks.splice(indexTaskDB, 1);
+    database.delete("tasks", idTask);
 
     return res.writeHead(200).end(`Task deleted!`);
   }
 
-  if(method === "PATCH" && url.includes("/tasks") && url.includes("/complete")){
-    const indexTaskDB = validateIdTask(req, res, url.split("/")[2]);
+  if (
+    method === "PATCH" &&
+    url.includes("/tasks") &&
+    url.includes("/complete")
+  ) {
+    const idTask = url.split("/")[2];
+    const [task] = database.select("tasks", idTask);
 
-    if (indexTaskDB == -1) return;
+    if(task.length == 0){
+      return res.writeHead(400).end("Task not found!");
+    }
 
-    const oldTask = dbTasks[indexTaskDB];
+    const completed_at = task.completed_at ? null : new Date();
 
-    dbTasks[indexTaskDB] = {
-      id: oldTask.id,
-      title: oldTask.title,
-      description: oldTask.description,
-      completed_at: oldTask.completed_at ? null : new Date(),
-      created_at: oldTask.created_at,
-      updated_at: oldTask.updated_at,
-    };
+    database.update("tasks", idTask, {completed_at});
 
     return res.writeHead(200).end(`Task updated!`);
   }
@@ -107,22 +112,6 @@ function validateRequestBody(req, res) {
   }
 
   return true;
-}
-
-function validateIdTask(req, res, idTask) {
-  if (idTask === "") {
-    res.writeHead(400).end("Task`s id can't be empty!");
-    return -1;
-  }
-
-  const indexTaskDB = dbTasks.findIndex((task) => task.id === idTask);
-
-  if (indexTaskDB == -1) {
-    res.writeHead(400).end("Task not found!");
-    return -1;;
-  }
-
-  return indexTaskDB;
 }
 
 server.listen(port);

@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import { parse } from "csv-parse";
 
-const stream = fs.createReadStream("./csv_desafio_01.csv");
+const csvPath = new URL('./csv_desafio_01.csv', import.meta.url);
+const stream = fs.createReadStream(csvPath);
 
 const csvParser = parse({
     skip_empty_lines: true,
